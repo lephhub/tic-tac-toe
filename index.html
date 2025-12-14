@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tic Tac Toe Arcade</title>
+<style>
+  body {
+    margin: 0; font-family: Arial; background: #0f172a;
+    color: white; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; height: 100vh;
+  }
+  h1 { font-size: 60px; color: #38bdf8; margin-bottom: 20px; }
+  .menu, .game { display: none; flex-direction: column; align-items: center; }
+  .menu.active, .game.active { display: flex; }
+  button {
+    font-size: 24px; padding: 15px 30px; margin: 10px;
+    border: none; border-radius: 10px; cursor: pointer;
+    transition: transform 0.2s, background 0.2s;
+  }
+  button:hover { transform: scale(1.1); }
+  .friend-btn { background: #2563eb; color: white; }
+  .easy-btn { background: #16a34a; color: white; }
+  .medium-btn { background: #ca8a04; color: white; }
+  .hard-btn { background: #dc2626; color: white; }
+  .board {
+    display: grid; grid-template-columns: repeat(3, 120px);
+    grid-template-rows: repeat(3, 120px); gap: 5px; margin-top: 30px;
+  }
+  .cell {
+    width: 120px; height: 120px; background: #1e293b;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 70px; cursor: pointer; transition: background 0.2s;
+  }
+  .cell:hover { background: #334155; }
+  .back-btn {
+    margin-top: 20px; padding: 10px 20px;
+    font-size: 20px; background: #334155; color: white; border-radius: 8px;
+  }
+</style>
+</head>
+<body>
+
+<h1>Tic Tac Toe</h1>
+
+<div class="menu active">
+  <h2>Choose Game Mode</h2>
+  <button class="friend-btn" onclick="startFriend()">Play with a Friend</button>
+  <h3>Robot Difficulty</h3>
+  <button class="easy-btn" onclick="startRobot('easy')">Easy</button>
+  <button class="medium-btn" onclick="startRobot('medium')">Medium</button>
+  <button class="hard-btn" onclick="startRobot('hard')">Hard</button>
+</div>
+
+<div class="game">
+  <div class="board"></div>
+  <button class="back-btn" onclick="backToMenu()">Back to Menu</button>
+</div>
+
+<!-- SOUND EFFECTS -->
+<audio id="clickSound" src="click.wav"></audio>
+<audio id="winSound" src="win.wav"></audio>
+<audio id="drawSound" src="draw.wav"></audio>
+
+<script>
+let board = ["","","","","","","","",""];
+let currentPlayer = "X";
+let gameMode = null;
+let robotLevel = null;
+
+const menu = document.querySelector('.menu');
+const gameDiv = document.querySelector('.game');
+const boardDiv = document.querySelector('.board');
+
+const clickSound = document.getElementById("clickSound");
+const winSound = document.getElementById("winSound");
+const drawSound = document.getElementById("drawSound");
+
+// Create board
+function createBoard() {
+  boardDiv.innerHTML = '';
+  board.forEach((cell, index) => {
+    const div = document.createElement('div');
+    div.classList.add('cell');
+    div.textContent = cell;
+    div.addEventListener('click', () => cellClick(index));
+    boardDiv.appendChild(div);
+  });
+}
+
+// Menu navigation
+function startFriend() { gameMode='friend'; menu.classList.remove('active'); gameDiv.classList.add('active'); resetBoard(); }
+function startRobot(level) { gameMode='robot'; robotLevel=level; menu.classList.remove('active'); gameDiv.classList.add('active'); resetBoard(); }
+function backToMenu() { gameDiv.classList.remove('active'); menu.classList.add('active'); }
+
+// Reset board
+function resetBoard() { board = ["","","","","","","","",""]; currentPlayer="X"; createBoard(); }
+
+// Check winner
+function checkWinner(player) {
+  const wins = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+  return wins.some(combo => combo.every(i => board[i]===player));
+}
+
+// Check draw
+function checkDraw() { return board.every(cell => cell!==""); }
+
+// Player click
+function cellClick(index){
+  if(board[index]!=="") return;
+  board[index] = currentPlayer;
+  createBoard();
+  clickSound.play();
+
+  if(checkWinner(currentPlayer)) {
+    setTimeout(()=>{winSound.play(); alert(currentPlayer+" wins!"); resetBoard();}, 100); return;
+  }
+  if(checkDraw()) {
+    setTimeout(()=>{drawSound.play(); alert("It's a draw!"); resetBoard();}, 100); return;
+  }
+
+  currentPlayer = currentPlayer==="X"?"O":"X";
+  if(gameMode==='robot' && currentPlayer==='O') setTimeout(robotMove,300);
+}
+
+// Robot AI
+function robotMove() {
+  let empty = board.map((v,i)=>v===""?i:null).filter(v=>v!==null);
+  let move;
+  if(robotLevel==='easy') move = empty[Math.floor(Math.random()*empty.length)];
+  else if(robotLevel==='medium') move = empty.find(i=>simulateWin('O',i)) || empty.find(i=>simulateWin('X',i)) || empty[Math.floor(Math.random()*empty.length)];
+  else move = minimax(board,"O").index;
+
+  board[move] = "O";
+  createBoard();
+  clickSound.play();
+
+  if(checkWinner("O")) { setTimeout(()=>{winSound.play(); alert("O wins!"); resetBoard();},100); return; }
+  if(checkDraw()) { setTimeout(()=>{drawSound.play(); alert("It's a draw!"); resetBoard();},100); return; }
+
+  currentPlayer = "X";
+}
+
+// Simulate win for medium AI
+function simulateWin(player,index){
+  let copy=board.slice(); copy[index]=player;
+  return checkWinnerSim(copy,player);
+}
+function checkWinnerSim(b,player){
+  const wins = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+  return wins.some(combo => combo.every(i=>b[i]===player));
+}
+
+// Minimax for hard AI
+function minimax(b,player){
+  const empty = b.map((v,i)=>v===""?i:null).filter(v=>v!==null);
+  if(checkWinnerSim(b,"X")) return {score:-10};
+  if(checkWinnerSim(b,"O")) return {score:10};
+  if(empty.length===0) return {score:0};
+  let moves = [];
+  for(let i of empty){
+    let newBoard = b.slice();
+    newBoard[i]=player;
+    let result = minimax(newBoard,player==="O"?"X":"O");
+    moves.push({index:i, score: result.score});
+  }
+  return player==="O"?moves.reduce((a,b)=>a.score>b.score?a:b):moves.reduce((a,b)=>a.score<b.score?a:b);
+}
+
+createBoard();
+</script>
+
+</body>
+</html>
